@@ -1,0 +1,364 @@
+// DatabaseManager.java
+import java.sql.*;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+public class DatabaseManager {
+    // Database connection details
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/travel_booking_db";
+    private static final String USER = "your_mysql_username"; // !!! REPLACE WITH YOUR MYSQL USERNAME !!!
+    private static final String PASS = "your_mysql_password"; // !!! REPLACE WITH YOUR MYSQL PASSWORD !!!
+
+    private Connection connection;
+
+    public DatabaseManager() {
+        try {
+            // Register JDBC driver (optional for modern JDBC, but good practice)
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            System.out.println("JDBC Driver registered.");
+        } catch (ClassNotFoundException e) {
+            System.err.println("MySQL JDBC Driver not found. Make sure mysql-connector-java.jar is in your classpath.");
+            e.printStackTrace();
+        }
+    }
+
+    // --- Connection Management ---
+    public void connect() throws SQLException {
+        if (connection == null || connection.isClosed()) {
+            System.out.println("Connecting to database...");
+            connection = DriverManager.getConnection(DB_URL, USER, PASS);
+            System.out.println("Database connection established.");
+        }
+    }
+
+    public void disconnect() {
+        if (connection != null) {
+            try {
+                connection.close();
+                System.out.println("Database connection closed.");
+            } catch (SQLException e) {
+                System.err.println("Error closing database connection: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+    }
+
+    // --- DDL Operations (Create Tables if not exist - useful for initial setup) ---
+    // NOTE: We already ran CREATE TABLE statements directly, but this can be useful for programmatic setup.
+    public void createTables() throws SQLException {
+        // This method is less crucial now that you've run the SQL script manually,
+        // but it's here for completeness if you wanted to manage schema from Java.
+        // For simplicity, we assume tables are already created.
+        System.out.println("Assuming database tables are already created.");
+    }
+
+    // --- CRUD Operations for User ---
+    public void saveUser(User user) throws SQLException {
+        String sql = "INSERT INTO users (username, password_hash, customer_id) VALUES (?, ?, ?)";
+        try (PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            stmt.setString(1, user.getUsername());
+            stmt.setString(2, user.getPasswordHash());
+            if (user.getCustomerProfile() != null) {
+                stmt.setInt(3, user.getCustomerProfile().getCustomerId());
+            } else {
+                stmt.setNull(3, Types.INTEGER);
+            }
+            stmt.executeUpdate();
+
+            // Get the auto-generated ID and set it back to the User object
+            try (ResultSet rs = stmt.getGeneratedKeys()) {
+                if (rs.next()) {
+                    user.setUserId(rs.getInt(1)); // Assuming you add a setUserId to your User class
+                    System.out.println("User '" + user.getUsername() + "' saved with ID: " + user.getUserId());
+                }
+            }
+        }
+    }
+
+    public User getUserByUsername(String username) throws SQLException {
+        String sql = "SELECT u.user_id, u.username, u.password_hash, c.customer_id, c.email, c.phone_number, c.violation_count " +
+                     "FROM users u LEFT JOIN customers c ON u.customer_id = c.customer_id WHERE u.username = ?";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, username);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    Customer customer = null;
+                    if (rs.getObject("customer_id") != null) {
+                        customer = new Customer(rs.getInt("customer_id"), rs.getString("email"), rs.getString("phone_number"));
+                        customer.setViolationCount(rs.getInt("violation_count")); // Assuming you add a setViolationCount
+                    }
+                    User user = new User(rs.getInt("user_id"), rs.getString("username"), rs.getString("password_hash"));
+                    user.setCustomerProfile(customer);
+                    return user;
+                }
+            }
+        }
+        return null;
+    }
+
+    public User getUserById(int userId) throws SQLException {
+        String sql = "SELECT u.user_id, u.username, u.password_hash, c.customer_id, c.email, c.phone_number, c.violation_count " +
+                     "FROM users u LEFT JOIN customers c ON u.customer_id = c.customer_id WHERE u.user_id = ?";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setInt(1, userId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    Customer customer = null;
+                    if (rs.getObject("customer_id") != null) {
+                        customer = new Customer(rs.getInt("customer_id"), rs.getString("email"), rs.getString("phone_number"));
+                        customer.setViolationCount(rs.getInt("violation_count")); // Assuming you add a setViolationCount
+                    }
+                    User user = new User(rs.getInt("user_id"), rs.getString("username"), rs.getString("password_hash"));
+                    user.setCustomerProfile(customer);
+                    return user;
+                }
+            }
+        }
+        return null;
+    }
+
+    // --- CRUD Operations for Customer ---
+    public void saveCustomer(Customer customer) throws SQLException {
+        String sql = "INSERT INTO customers (email, phone_number, violation_count) VALUES (?, ?, ?)";
+        try (PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            stmt.setString(1, customer.getEmail());
+            stmt.setString(2, customer.getPhoneNumber());
+            stmt.setInt(3, customer.getViolationCount());
+            stmt.executeUpdate();
+
+            try (ResultSet rs = stmt.getGeneratedKeys()) {
+                if (rs.next()) {
+                    customer.setCustomerId(rs.getInt(1)); // Assuming you add a setCustomerId to your Customer class
+                    System.out.println("Customer '" + customer.getEmail() + "' saved with ID: " + customer.getCustomerId());
+                }
+            }
+        }
+    }
+
+    public Customer getCustomerById(int customerId) throws SQLException {
+        String sql = "SELECT customer_id, email, phone_number, violation_count FROM customers WHERE customer_id = ?";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setInt(1, customerId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    Customer customer = new Customer(rs.getInt("customer_id"), rs.getString("email"), rs.getString("phone_number"));
+                    customer.setViolationCount(rs.getInt("violation_count"));
+                    return customer;
+                }
+            }
+        }
+        return null;
+    }
+
+    public void updateCustomer(Customer customer) throws SQLException {
+        String sql = "UPDATE customers SET email = ?, phone_number = ?, violation_count = ? WHERE customer_id = ?";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, customer.getEmail());
+            stmt.setString(2, customer.getPhoneNumber());
+            stmt.setInt(3, customer.getViolationCount());
+            stmt.setInt(4, customer.getCustomerId());
+            stmt.executeUpdate();
+            System.out.println("Customer " + customer.getCustomerId() + " updated.");
+        }
+    }
+
+    // --- CRUD Operations for Booking ---
+    public void saveBooking(Booking booking, int userId, int customerId) throws SQLException {
+        String sql = "INSERT INTO bookings (user_id, customer_id, booking_date, vehicle_type, pickup_location, dropoff_location, original_cost, payment_status, booking_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            stmt.setInt(1, userId);
+            stmt.setInt(2, customerId);
+            stmt.setTimestamp(3, Timestamp.valueOf(booking.getDate()));
+            stmt.setString(4, booking.getVehicleType());
+            stmt.setString(5, booking.getPickupLocation());
+            stmt.setString(6, booking.getDropoffLocation());
+            stmt.setDouble(7, booking.getOriginalCost());
+            stmt.setString(8, booking.getPaymentStatus());
+            stmt.setString(9, booking.getStatus());
+            stmt.executeUpdate();
+
+            try (ResultSet rs = stmt.getGeneratedKeys()) {
+                if (rs.next()) {
+                    booking.setBookingId(rs.getInt(1)); // Assuming you add a setBookingId to your Booking class
+                    System.out.println("Booking " + booking.getBookingId() + " saved for user " + userId);
+                }
+            }
+        }
+    }
+
+    public Booking getBookingById(int bookingId) throws SQLException {
+        String sql = "SELECT booking_id, booking_date, vehicle_type, pickup_location, dropoff_location, original_cost, payment_status, booking_status " +
+                     "FROM bookings WHERE booking_id = ?";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setInt(1, bookingId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    Booking booking = new Booking(
+                        rs.getInt("booking_id"),
+                        rs.getTimestamp("booking_date").toLocalDateTime(),
+                        rs.getString("vehicle_type"),
+                        rs.getString("pickup_location"),
+                        rs.getString("dropoff_location"),
+                        rs.getDouble("original_cost")
+                    );
+                    booking.setPaymentStatus(rs.getString("payment_status"));
+                    booking.setStatus(rs.getString("booking_status"));
+                    return booking;
+                }
+            }
+        }
+        return null;
+    }
+
+    public List<Booking> getBookingsByUserId(int userId) throws SQLException {
+        List<Booking> bookings = new ArrayList<>();
+        String sql = "SELECT booking_id, booking_date, vehicle_type, pickup_location, dropoff_location, original_cost, payment_status, booking_status FROM bookings WHERE user_id = ?";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setInt(1, userId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Booking booking = new Booking(
+                        rs.getInt("booking_id"),
+                        rs.getTimestamp("booking_date").toLocalDateTime(),
+                        rs.getString("vehicle_type"),
+                        rs.getString("pickup_location"),
+                        rs.getString("dropoff_location"),
+                        rs.getDouble("original_cost")
+                    );
+                    booking.setPaymentStatus(rs.getString("payment_status"));
+                    booking.setStatus(rs.getString("booking_status"));
+                    bookings.add(booking);
+                }
+            }
+        }
+        return bookings;
+    }
+
+    public void updateBooking(Booking booking) throws SQLException {
+        String sql = "UPDATE bookings SET booking_date = ?, vehicle_type = ?, pickup_location = ?, dropoff_location = ?, original_cost = ?, payment_status = ?, booking_status = ? WHERE booking_id = ?";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setTimestamp(1, Timestamp.valueOf(booking.getDate()));
+            stmt.setString(2, booking.getVehicleType());
+            stmt.setString(3, booking.getPickupLocation());
+            stmt.setString(4, booking.getDropoffLocation());
+            stmt.setDouble(5, booking.getOriginalCost());
+            stmt.setString(6, booking.getPaymentStatus());
+            stmt.setString(7, booking.getStatus());
+            stmt.setInt(8, booking.getBookingId());
+            stmt.executeUpdate();
+            System.out.println("Booking " + booking.getBookingId() + " updated.");
+        }
+    }
+
+
+    // --- CRUD Operations for Cancellation ---
+    public void saveCancellation(Cancellation cancellation, int bookingId) throws SQLException {
+        String sql = "INSERT INTO cancellations (booking_id, cancellation_date, cancellation_reason, refund_amount, penalty_applied) VALUES (?, ?, ?, ?, ?)";
+        try (PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            stmt.setInt(1, bookingId);
+            stmt.setTimestamp(2, Timestamp.valueOf(cancellation.getCancellationDate()));
+            stmt.setString(3, cancellation.getCancellationReason());
+            stmt.setDouble(4, cancellation.getRefundAmount());
+            stmt.setBoolean(5, cancellation.isPenaltyApplied());
+            stmt.executeUpdate();
+
+            try (ResultSet rs = stmt.getGeneratedKeys()) {
+                if (rs.next()) {
+                    cancellation.setCancellationId(rs.getInt(1)); // Assuming you add setCancellationId
+                    System.out.println("Cancellation " + cancellation.getCancellationId() + " saved for booking " + bookingId);
+                }
+            }
+        }
+    }
+
+    // --- CRUD Operations for CancellationPolicy ---
+    public void saveCancellationPolicy(CancellationPolicy policy) throws SQLException {
+        String sql = "INSERT INTO cancellation_policies (policy_name, rule_set_description) VALUES (?, ?)";
+        try (PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            stmt.setString(1, policy.getPolicyName());
+            stmt.setString(2, policy.getRuleSetDescription());
+            stmt.executeUpdate();
+
+            try (ResultSet rs = stmt.getGeneratedKeys()) {
+                if (rs.next()) {
+                    policy.setPolicyId(rs.getInt(1)); // Assuming you add setPolicyId
+                    System.out.println("Cancellation Policy '" + policy.getPolicyName() + "' saved with ID: " + policy.getPolicyId());
+                }
+            }
+        }
+    }
+
+    public CancellationPolicy getCancellationPolicyById(int policyId) throws SQLException {
+        String sql = "SELECT policy_id, policy_name, rule_set_description FROM cancellation_policies WHERE policy_id = ?";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setInt(1, policyId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return new CancellationPolicy(
+                        rs.getInt("policy_id"),
+                        rs.getString("policy_name"),
+                        rs.getString("rule_set_description")
+                    );
+                }
+            }
+        }
+        return null;
+    }
+
+    public CancellationPolicy getCancellationPolicyByName(String policyName) throws SQLException {
+        String sql = "SELECT policy_id, policy_name, rule_set_description FROM cancellation_policies WHERE policy_name = ?";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, policyName);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return new CancellationPolicy(
+                        rs.getInt("policy_id"),
+                        rs.getString("policy_name"),
+                        rs.getString("rule_set_description")
+                    );
+                }
+            }
+        }
+        return null;
+    }
+
+    // --- CRUD Operations for Payment ---
+    public void savePayment(Payment payment) throws SQLException {
+        String sql = "INSERT INTO payments (booking_id, amount, payment_type, transaction_date, status) VALUES (?, ?, ?, ?, ?)";
+        try (PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            if (payment.getBookingId() > 0) { // Check if booking_id is valid for DB insertion
+                stmt.setInt(1, payment.getBookingId());
+            } else {
+                stmt.setNull(1, Types.INTEGER); // Allow NULL if not directly tied to a booking
+            }
+            stmt.setDouble(2, payment.getAmount());
+            stmt.setString(3, payment.getPaymentType());
+            stmt.setTimestamp(4, Timestamp.valueOf(payment.getTransactionDate()));
+            stmt.setString(5, payment.getStatus());
+            stmt.executeUpdate();
+
+            try (ResultSet rs = stmt.getGeneratedKeys()) {
+                if (rs.next()) {
+                    payment.setPaymentId(rs.getInt(1)); // Assuming you add setPaymentId
+                    System.out.println("Payment " + payment.getPaymentId() + " saved. Status: " + payment.getStatus());
+                }
+            }
+        }
+    }
+
+    public void updatePayment(Payment payment) throws SQLException {
+        String sql = "UPDATE payments SET amount = ?, payment_type = ?, transaction_date = ?, status = ? WHERE payment_id = ?";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setDouble(1, payment.getAmount());
+            stmt.setString(2, payment.getPaymentType());
+            stmt.setTimestamp(3, Timestamp.valueOf(payment.getTransactionDate()));
+            stmt.setString(4, payment.getStatus());
+            stmt.setInt(5, payment.getPaymentId());
+            stmt.executeUpdate();
+            System.out.println("Payment " + payment.getPaymentId() + " updated to status: " + payment.getStatus());
+        }
+    }
+
+    // --- Add more CRUD operations for other classes as needed (Attraction, Route, etc. in future steps) ---
+}
