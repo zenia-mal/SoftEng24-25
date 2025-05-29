@@ -1,0 +1,367 @@
+// User.java
+
+import java.util.ArrayList;
+import java.util.List;
+import java.time.LocalDateTime;
+
+public class User {
+    private int userId;
+    private String username;
+    private String passwordHash; // Σε πραγματική εφαρμογή θα ήταν hashed και salted
+    private Customer customerProfile; // Σχέση με Customer
+
+    private List<Booking> bookings; // Αυτό θα το διαχειρίζεται η DB, αλλά το κρατάμε για αναφορά/ευκολία
+
+    public User(int userId, String username, String passwordHash) {
+        this.userId = userId;
+        this.username = username;
+        this.passwordHash = passwordHash;
+        this.bookings = new ArrayList<>();
+        this.customerProfile = null; // Θα αρχικοποιηθεί από DB ή System
+    }
+
+    // Getters
+    public int getUserId() { return userId; }
+    public String getUsername() { return username; }
+    public String getPasswordHash() { return passwordHash; }
+    public Customer getCustomerProfile() { return customerProfile; }
+    public List<Booking> getBookings() { return bookings; }
+
+
+    // *** ΝΕΟΣ SETTER ΓΙΑ userId ***
+    public void setUserId(int userId) {
+        this.userId = userId;
+    }
+
+    // Setters
+    public void setCustomerProfile(Customer customerProfile) {
+        this.customerProfile = customerProfile;
+    }
+
+    // Μέθοδοι με λογική
+    public boolean authenticate(String username, String password) {
+        // Πολύ απλή λογική για δοκιμή - σε πραγματική εφαρμογή θα ήταν πιο ασφαλής
+        boolean isAuthenticated = this.username.equals(username) && this.passwordHash.equals(password);
+        if (isAuthenticated) {
+            System.out.println("User '" + username + "' authenticated successfully.");
+        } else {
+            System.out.println("Authentication failed for user '" + username + "'.");
+        }
+        return isAuthenticated;
+    }
+
+    // Σημείωση: Το addBooking εδώ θα προσθέτει σε μια τοπική λίστα,
+    // η πραγματική αποθήκευση γίνεται μέσω DatabaseManager.
+    public void addBooking(Booking booking) {
+        this.bookings.add(booking);
+        // System.out.println("Booking " + booking.getBookingId() + " added to user's local list " + this.username + ".");
+    }
+
+    public Booking getBooking(int bookingId) {
+        for (Booking booking : bookings) {
+            if (booking.getBookingId() == bookingId) {
+                return booking;
+            }
+        }
+        return null; // Δεν βρέθηκε
+    }
+}
+
+// Customer.java
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class Customer {
+    private int customerId;
+    private String email;
+    private String phoneNumber;
+    private int violationCount;
+
+    private List<Booking> bookings; // Αυτό θα το διαχειρίζεται η DB, αλλά το κρατάμε για αναφορά/ευκολία
+
+    public Customer(int customerId, String email, String phoneNumber) {
+        this.customerId = customerId;
+        this.email = email;
+        this.phoneNumber = phoneNumber;
+        this.violationCount = 0;
+        this.bookings = new ArrayList<>();
+    }
+
+    // Getters
+    public int getCustomerId() { return customerId; }
+    public String getEmail() { return email; }
+    public String getPhoneNumber() { return phoneNumber; }
+    public int getViolationCount() { return violationCount; }
+    public List<Booking> getBookings() { return bookings; }
+
+    // *** ΝΕΟΣ SETTER ΓΙΑ customerId ***
+    public void setCustomerId(int customerId) {
+        this.customerId = customerId;
+    }
+
+    // *** ΝΕΟΣ SETTER ΓΙΑ violationCount ***
+    public void setViolationCount(int violationCount) {
+        this.violationCount = violationCount;
+    }
+
+    // Μέθοδοι με λογική
+    public void incrementViolationCount() {
+        this.violationCount++;
+        System.out.println("Violation count incremented for customer " + this.customerId + ". New count: " + this.violationCount);
+    }
+
+    // Σημείωση: Το addBooking εδώ θα προσθέτει σε μια τοπική λίστα,
+    // η πραγματική αποθήκευση γίνεται μέσω DatabaseManager.
+    public void addBooking(Booking booking) {
+        this.bookings.add(booking);
+        // System.out.println("Booking " + booking.getBookingId() + " added to customer's local list " + this.customerId + ".");
+    }
+}
+// Booking.java
+
+import java.time.LocalDateTime;
+import java.time.Duration;
+
+public class Booking {
+    private int bookingId;
+    private LocalDateTime date;
+    private String vehicleType;
+    private String pickupLocation;
+    private String dropoffLocation;
+    private String paymentStatus; // e.g., "Pending", "Paid", "Refunded"
+    private double originalCost;
+    private String status;        // e.g., "Confirmed", "Cancelled", "Completed"
+
+    public Booking(int bookingId, LocalDateTime date, String vehicleType,
+                   String pickupLocation, String dropoffLocation, double originalCost) {
+        this.bookingId = bookingId;
+        this.date = date;
+        this.vehicleType = vehicleType;
+        this.pickupLocation = pickupLocation;
+        this.dropoffLocation = dropoffLocation;
+        this.originalCost = originalCost;
+        this.paymentStatus = "Pending";
+        this.status = "Confirmed";
+    }
+
+    // Getters
+    public int getBookingId() { return bookingId; }
+    public LocalDateTime getDate() { return date; }
+    public String getVehicleType() { return vehicleType; }
+    public String getPickupLocation() { return pickupLocation; }
+    public String getDropoffLocation() { return dropoffLocation; }
+    public String getPaymentStatus() { return paymentStatus; }
+    public double getOriginalCost() { return originalCost; }
+    public String getStatus() { return status; }
+
+    // *** ΝΕΟΣ SETTER ΓΙΑ bookingId ***
+    public void setBookingId(int bookingId) {
+        this.bookingId = bookingId;
+    }
+
+    // Setters
+    public void setPaymentStatus(String paymentStatus) {
+        System.out.println("Booking " + bookingId + " payment status changed from " + this.paymentStatus + " to " + paymentStatus + ".");
+        this.paymentStatus = paymentStatus;
+    }
+
+    public void setStatus(String status) {
+        System.out.println("Booking " + bookingId + " status changed from " + this.status + " to " + status + ".");
+        this.status = status;
+    }
+
+    // Μέθοδοι με λογική
+    public long getRemainingTimeInHours() {
+        if (date == null) {
+            return 0; // Ή πέτα εξίσωση
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (now.isAfter(date)) {
+            return 0; // Η κράτηση είναι στο παρελθόν
+        }
+        Duration duration = Duration.between(now, date);
+        long hours = duration.toHours();
+        System.out.println("Remaining time for Booking " + bookingId + ": " + hours + " hours.");
+        return hours;
+    }
+
+    public boolean cancel(Cancellation cancellationDetails) {
+        if (!this.status.equals("Confirmed")) {
+            System.out.println("Booking " + bookingId + " cannot be cancelled. Current status: " + this.status);
+            return false;
+        }
+        // Ενημέρωση της κατάστασης της κράτησης
+        this.setStatus("Cancelled");
+        System.out.println("Booking " + bookingId + " has been cancelled.");
+        // Σε μια πλήρη υλοποίηση, θα μπορούσε να αποθηκεύσει το cancellationDetails
+        return true;
+    }
+}
+// Cancellation.java
+
+import java.time.LocalDateTime;
+
+public class Cancellation {
+    private int cancellationId;
+    private LocalDateTime cancellationDate;
+    private String cancellationReason;
+    private double refundAmount;
+    private boolean penaltyApplied;
+
+    public Cancellation(int cancellationId, String cancellationReason) {
+        this.cancellationId = cancellationId;
+        this.cancellationDate = LocalDateTime.now();
+        this.cancellationReason = cancellationReason;
+        this.refundAmount = 0.0;
+        this.penaltyApplied = false;
+    }
+
+    // Getters
+    public int getCancellationId() { return cancellationId; }
+    public LocalDateTime getCancellationDate() { return cancellationDate; }
+    public String getCancellationReason() { return cancellationReason; }
+    public double getRefundAmount() { return refundAmount; }
+    public boolean isPenaltyApplied() { return penaltyApplied; }
+
+    // *** ΝΕΟΣ SETTER ΓΙΑ cancellationId ***
+    public void setCancellationId(int cancellationId) {
+        this.cancellationId = cancellationId;
+    }
+
+    // Setters
+    public void setRefundAmount(double refundAmount) {
+        this.refundAmount = refundAmount;
+        System.out.println("Cancellation " + cancellationId + ": Refund amount set to " + String.format("%.2f", refundAmount));
+    }
+
+    public void setPenaltyApplied(boolean penaltyApplied) {
+        this.penaltyApplied = penaltyApplied;
+        System.out.println("Cancellation " + cancellationId + ": Penalty applied status set to " + penaltyApplied);
+    }
+
+    // Μέθοδοι με λογική
+    public double calculateRefund(double originalCost, CancellationPolicy policy, long remainingHours) {
+        double penalty = policy.calculatePenalty(originalCost, (int) remainingHours);
+        double refund = originalCost - penalty;
+        this.setRefundAmount(refund);
+        if (penalty > 0) {
+            this.setPenaltyApplied(true);
+        }
+        System.out.println("Cancellation " + cancellationId + ": Original Cost: " + originalCost + ", Penalty: " + String.format("%.2f", penalty) + ", Calculated Refund: " + String.format("%.2f", refund));
+        return refund;
+    }
+
+    public double applyPenalty(double originalCost, CancellationPolicy policy, long remainingHours) {
+        double penalty = policy.calculatePenalty(originalCost, (int) remainingHours);
+        if (penalty > 0) {
+            this.setPenaltyApplied(true);
+        }
+        System.out.println("Cancellation " + cancellationId + ": Applied penalty of " + String.format("%.2f", penalty) + " (based on " + remainingHours + " hours remaining).");
+        return penalty;
+    }
+}
+// CancellationPolicy.java
+
+public class CancellationPolicy {
+    private int policyId;
+    private String policyName;
+    private String ruleSetDescription;
+
+    public CancellationPolicy(int policyId, String policyName, String ruleSetDescription) {
+        this.policyId = policyId;
+        this.policyName = policyName;
+        this.ruleSetDescription = ruleSetDescription;
+    }
+
+    // Getters
+    public int getPolicyId() { return policyId; }
+    public String getPolicyName() { return policyName; }
+    public String getRuleSetDescription() { return ruleSetDescription; }
+
+    // *** ΝΕΟΣ SETTER ΓΙΑ policyId ***
+    public void setPolicyId(int policyId) {
+        this.policyId = policyId;
+    }
+
+    // Μέθοδοι με λογική
+    public double getPenaltyPercentage(int remainingHours) {
+        // Ενδεικτική λογική πολιτικής ακύρωσης
+        if (remainingHours < 12) {
+            return 1.0; // 100% ποινή αν λιγότερο από 12 ώρες
+        } else if (remainingHours < 24) {
+            return 0.5; // 50% ποινή αν λιγότερο από 24 ώρες
+        } else {
+            return 0.0; // 0% ποινή
+        }
+    }
+
+    public double calculatePenalty(double originalCost, int remainingHours) {
+        double percentage = getPenaltyPercentage(remainingHours);
+        double penaltyAmount = originalCost * percentage;
+        System.out.println("CancellationPolicy " + policyId + ": Calculated penalty of " + String.format("%.2f", penaltyAmount) + " for " + remainingHours + " hours remaining (at " + (percentage * 100) + "%).");
+        return penaltyAmount;
+    }
+}
+// Payment.java
+
+import java.time.LocalDateTime;
+
+public class Payment {
+    private int paymentId;
+    private int bookingId; // Μπορεί να είναι 0 ή -1 αν δεν συνδέεται άμεσα με μια κράτηση
+    private double amount;
+    private String paymentType;
+    private LocalDateTime transactionDate;
+    private String status; // e.g., "Pending", "Paid", "Refunded", "Failed"
+
+    public Payment(int paymentId, int bookingId, double amount, String paymentType) {
+        this.paymentId = paymentId;
+        this.bookingId = bookingId;
+        this.amount = amount;
+        this.paymentType = paymentType;
+        this.transactionDate = LocalDateTime.now();
+        this.status = "Pending";
+    }
+
+    // Getters
+    public int getPaymentId() { return paymentId; }
+    public int getBookingId() { return bookingId; }
+    public double getAmount() { return amount; }
+    public String getPaymentType() { return paymentType; }
+    public LocalDateTime getTransactionDate() { return transactionDate; }
+    public String getStatus() { return status; }
+
+    // *** ΝΕΟΣ SETTER ΓΙΑ paymentId ***
+    public void setPaymentId(int paymentId) {
+        this.paymentId = paymentId;
+    }
+
+    // Setters
+    public void setStatus(String status) {
+        System.out.println("Payment " + paymentId + ": Status changed from " + this.status + " to " + status + ".");
+        this.status = status;
+    }
+
+    // Μέθοδοι με λογική
+    public boolean processPayment() {
+        if (this.status.equals("Pending")) {
+            this.setStatus("Paid");
+            System.out.println("Payment " + paymentId + " of " + String.format("%.2f", amount) + " processed successfully.");
+            return true;
+        }
+        System.out.println("Payment " + paymentId + " cannot be processed. Current status: " + this.status);
+        return false;
+    }
+
+    public boolean processRefund(double refundAmount) {
+        if (this.status.equals("Paid")) { // Μπορούμε να κάνουμε refund μόνο αν έχει πληρωθεί
+            this.setStatus("Refunded");
+            // Σε ένα πραγματικό σύστημα, εδώ θα καλούσαμε ένα API πληρωμών
+            System.out.println("Refund of " + String.format("%.2f", refundAmount) + " processed for Payment " + paymentId + ".");
+            return true;
+        }
+        System.out.println("Refund for Payment " + paymentId + " cannot be processed. Current status: " + this.status);
+        return false;
+    }
+}
