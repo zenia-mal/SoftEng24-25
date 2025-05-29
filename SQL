@@ -1,0 +1,170 @@
+-- SQL Schema for Travel Booking & Attractions System (MySQL)
+
+-- Drop database if it exists to ensure a clean start
+DROP DATABASE IF EXISTS travel_booking_db;
+
+-- Create the database
+CREATE DATABASE travel_booking_db;
+
+-- Use the newly created database
+USE travel_booking_db;
+
+-- Table for User
+-- Corresponds to Java class: User
+DROP TABLE IF EXISTS users;
+CREATE TABLE users (
+    user_id INT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL, -- Use a longer hash for real applications
+    customer_id INT UNIQUE, -- Foreign key to customers table
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table for Customer
+-- Corresponds to Java class: Customer
+DROP TABLE IF EXISTS customers;
+CREATE TABLE customers (
+    customer_id INT PRIMARY KEY AUTO_INCREMENT,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    phone_number VARCHAR(20),
+    violation_count INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add foreign key constraint to users table after customers is created
+ALTER TABLE users
+ADD CONSTRAINT fk_user_customer
+FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- Table for Booking (for travel/transportation, not rooms)
+-- Corresponds to Java class: Booking
+DROP TABLE IF EXISTS bookings;
+CREATE TABLE bookings (
+    booking_id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL, -- Foreign key to users table
+    customer_id INT,    -- Foreign key to customers table (redundant but useful for direct link)
+    booking_date DATETIME NOT NULL,
+    vehicle_type VARCHAR(50) NOT NULL,
+    pickup_location VARCHAR(255) NOT NULL,
+    dropoff_location VARCHAR(255) NOT NULL,
+    original_cost DECIMAL(10, 2) NOT NULL,
+    payment_status ENUM('Pending', 'Paid', 'Refunded', 'Failed') DEFAULT 'Pending',
+    booking_status ENUM('Confirmed', 'Cancelled', 'Completed', 'Pending') DEFAULT 'Confirmed',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_booking_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_booking_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- Table for Cancellation
+-- Corresponds to Java class: Cancellation
+DROP TABLE IF EXISTS cancellations;
+CREATE TABLE cancellations (
+    cancellation_id INT PRIMARY KEY AUTO_INCREMENT,
+    booking_id INT NOT NULL, -- Foreign key to bookings table
+    cancellation_date DATETIME NOT NULL,
+    cancellation_reason VARCHAR(255),
+    refund_amount DECIMAL(10, 2) NOT NULL,
+    penalty_applied BOOLEAN DEFAULT FALSE,
+    CONSTRAINT fk_cancellation_booking FOREIGN KEY (booking_id) REFERENCES bookings(booking_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- Table for CancellationPolicy
+-- Corresponds to Java class: CancellationPolicy
+DROP TABLE IF EXISTS cancellation_policies;
+CREATE TABLE cancellation_policies (
+    policy_id INT PRIMARY KEY AUTO_INCREMENT,
+    policy_name VARCHAR(100) NOT NULL UNIQUE,
+    rule_set_description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table for Payment (related to general bookings/refunds)
+-- Corresponds to Java class: Payment
+DROP TABLE IF EXISTS payments;
+CREATE TABLE payments (
+    payment_id INT PRIMARY KEY AUTO_INCREMENT,
+    booking_id INT, -- Can be NULL if it's a standalone payment/refund not directly tied to a booking at creation
+    amount DECIMAL(10, 2) NOT NULL,
+    payment_type VARCHAR(50), -- e.g., 'Credit Card', 'PayPal', 'Refund'
+    transaction_date DATETIME NOT NULL,
+    status ENUM('Pending', 'Paid', 'Refunded', 'Failed') DEFAULT 'Pending',
+    CONSTRAINT fk_payment_booking FOREIGN KEY (booking_id) REFERENCES bookings(booking_id) ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+
+-- Table for Attraction
+-- Corresponds to Java class: Attraction
+DROP TABLE IF EXISTS attractions;
+CREATE TABLE attractions (
+    attraction_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    location VARCHAR(255),
+    rating DECIMAL(2, 1) -- e.g., 4.5
+);
+
+-- Table for Route
+-- Corresponds to Java class: Route
+DROP TABLE IF EXISTS routes;
+CREATE TABLE routes (
+    route_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    estimated_duration_hours DECIMAL(5, 2),
+    cost DECIMAL(10, 2),
+    difficulty_level ENUM('Easy', 'Medium', 'Hard')
+);
+
+-- Junction table for Route-Attraction Many-to-Many relationship
+DROP TABLE IF EXISTS route_attractions;
+CREATE TABLE route_attractions (
+    route_id INT NOT NULL,
+    attraction_id INT NOT NULL,
+    PRIMARY KEY (route_id, attraction_id),
+    CONSTRAINT fk_route_attraction_route FOREIGN KEY (route_id) REFERENCES routes(route_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_route_attraction_attraction FOREIGN KEY (attraction_id) REFERENCES attractions(attraction_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+
+-- Table for PickupPoint
+-- Corresponds to Java class: PickupPoint
+DROP TABLE IF EXISTS pickup_points;
+CREATE TABLE pickup_points (
+    point_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    address VARCHAR(255),
+    city VARCHAR(100)
+);
+
+-- Table for ExternalTravelService
+-- Corresponds to Java class: ExternalTravelService
+DROP TABLE IF EXISTS external_travel_services;
+CREATE TABLE external_travel_services (
+    service_id INT PRIMARY KEY AUTO_INCREMENT,
+    service_name VARCHAR(255) NOT NULL UNIQUE,
+    api_url VARCHAR(255)
+);
+
+-- Table for HotelOption
+-- Corresponds to Java class: HotelOption
+-- Note: This might store options from external services, not internal hotel rooms
+DROP TABLE IF EXISTS hotel_options;
+CREATE TABLE hotel_options (
+    hotel_id INT PRIMARY KEY AUTO_INCREMENT,
+    service_id INT, -- Foreign key to external_travel_services
+    name VARCHAR(255) NOT NULL,
+    address VARCHAR(255),
+    price_per_night DECIMAL(10, 2),
+    rating DECIMAL(2, 1),
+    CONSTRAINT fk_hotel_service FOREIGN KEY (service_id) REFERENCES external_travel_services(service_id) ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- Table for ProfileAnalyzer
+-- Corresponds to Java class: ProfileAnalyzer
+DROP TABLE IF EXISTS profile_analyzers;
+CREATE TABLE profile_analyzers (
+    analyzer_id INT PRIMARY KEY AUTO_INCREMENT,
+    algorithm_name VARCHAR(100) NOT NULL,
+    last_run_date DATETIME
+);
